@@ -1,46 +1,25 @@
-#include <iostream>
-#include <vector>
+// task url https://atcoder.jp/contests/acl1/tasks/acl1_a
+// problem statement: https://hackmd.io/@InL1-d3QTEuuv1yqrRRg3g/HyQr0x48gg
+
+#include <sys/resource.h>
 #include <algorithm>
-#include <cmath>
-#include <string>
-#include <map>
-#include <set>
-#include <queue>
-#include <stack>
-#include <deque>
-#include <list>
-#include <bitset>
-#include <numeric>
-#include <functional>
 #include <cassert>
-#include <iomanip>
-#include <sstream>
-#include <fstream>
-#include <iterator>
-#include <limits>
-#include <utility>
 #include <ctime>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
-#include <climits>
-
-//#define DEBUG
 
 const int MAX_ELEMENT_NUM = 200000;
 
 struct Node
 {
-    int x, y, index;
-    int category_index;
+    int x, y;
+    int minimum_root, maxmum_root;
+    int connected_counts;
 };
 
 Node nodes[MAX_ELEMENT_NUM];
-int nodex_index_map[MAX_ELEMENT_NUM];
-int tmp_path_array[MAX_ELEMENT_NUM];
-int X_INDEX_MAP[MAX_ELEMENT_NUM + 1];
-int Y_INDEX_MAP[MAX_ELEMENT_NUM + 1];
-int category_result[MAX_ELEMENT_NUM];
+int nodes_sorted_index[MAX_ELEMENT_NUM + 1];
 
 bool compareNodes(const Node &a, const Node &b)
 {
@@ -56,11 +35,11 @@ void sortNodes(Node nodes[], int n)
     std::sort(nodes, nodes + n, compareNodes);
 }
 
-void printOriginArrayInfo(Node nodes[], int node_index_map[], int n)
+void printOriginArrayInfo(Node nodes[], int n)
 {
     for (int i = 0; i < n; i++)
     {
-        printf("%d %d %d %d\n", nodes[node_index_map[i]].index, nodes[node_index_map[i]].x, nodes[node_index_map[i]].y, nodes[node_index_map[i]].category_index);
+        printf("%d %d %d %d %d\n", nodes[i].x, nodes[i].y, nodes[i].minimum_root, nodes[i].maxmum_root, nodes[i].connected_counts);
     }
 }
 
@@ -70,101 +49,71 @@ int main()
     scanf("%d", &n);
 
     memset(nodes, 0, sizeof(nodes));
-    memset(nodex_index_map, 0, sizeof(nodex_index_map));
-    memset(tmp_path_array, 0, sizeof(tmp_path_array));
-    memset(X_INDEX_MAP, 0, sizeof(X_INDEX_MAP));
-    memset(Y_INDEX_MAP, 0, sizeof(Y_INDEX_MAP));
-    memset(category_result, 0, sizeof(category_result));
 
     for (int i = 0; i < n; i++)
     {
-        scanf("%d %d", &nodes[i].x, &nodes[i].y);
+        int x, y;
+        scanf("%d %d", &x, &y);
+        nodes[i].x = x;
+        nodes[i].y = y;
+        nodes[i].minimum_root = y; // 初始化最小父节点为当前节点的 y 值
+        nodes[i].maxmum_root = y;  // 初始化最大父节点为当前节点
 
-        nodes[i].index = i;
-        nodes[i].category_index = -1;
-        X_INDEX_MAP[nodes[i].x] = i;
-        Y_INDEX_MAP[nodes[i].y] = i;
+        // 利用 N+1空间大小的 array 进行排序
+        nodes_sorted_index[x] = i;
     }
 
-    sortNodes(nodes, n);
-
-    // init sorted nodes map
-    for (int i = 0; i < n; i++)
+    // 更新每个节点的最小父节点，其中对于 x=1 的节点，最小父节点只能是它本身，所以从 x=2 开始更新
+    for (int i = 2; i <= n; i++)
     {
-        nodex_index_map[nodes[i].index] = i;
-    }
-
-#ifdef DEBUG
-    for (int i = 0; i < n; i++)
-    {
-        printf("index: %d; x: %d; y: %d; category: %d\n", nodes[i].index, nodes[i].x, nodes[i].y, nodes[i].category_index);
-    }
-
-    printOriginArrayInfo(nodes, nodex_index_map, n);
-
-    printf("y=7 info: %d %d %d\n", nodes[nodex_index_map[Y_INDEX_MAP[7]]].index, nodes[nodex_index_map[Y_INDEX_MAP[7]]].x, nodes[nodex_index_map[Y_INDEX_MAP[7]]].y);
-    printf("x=3 info: %d %d %d\n", nodes[nodex_index_map[X_INDEX_MAP[3]]].index, nodes[nodex_index_map[X_INDEX_MAP[3]]].x, nodes[nodex_index_map[X_INDEX_MAP[3]]].y);
-#endif
-
-    int max_category_index = 0;
-    for (int i = 0; i < n; i++)
-    {
-        int current_category_index = max_category_index;
-        if (-1 != nodes[i].category_index)
+        if (nodes[nodes_sorted_index[i - 1]].minimum_root < nodes[nodes_sorted_index[i]].y)
         {
-            current_category_index = nodes[i].category_index;
+            nodes[nodes_sorted_index[i]].minimum_root = nodes[nodes_sorted_index[i - 1]].minimum_root;
         }
-        else
+    }
+
+    // 更新每个节点的最大父节点，其中对于 x=n 的节点，最大父节点只能是它本身，所以从 x=n-1 开始更新
+    for (int i = n - 1; i > 0; i--)
+    {
+        if (nodes[nodes_sorted_index[i + 1]].maxmum_root > nodes[nodes_sorted_index[i]].y)
         {
-            nodes[i].category_index = current_category_index;
+            nodes[nodes_sorted_index[i]].maxmum_root = nodes[nodes_sorted_index[i + 1]].maxmum_root;
         }
+    }
 
-        tmp_path_array[0] = i;
-        int tmp_path_array_index = 1;
-
-        for (int j = nodes[i].y + 1; j <= n; j++)
+    // 更新最后结果
+    int last_minimum_root = 1;
+    for (int i = 2; i <= n; i++)
+    {
+        if (nodes[nodes_sorted_index[i]].maxmum_root < nodes[nodes_sorted_index[i - 1]].minimum_root)
         {
-            Node *tmp_node = &nodes[nodex_index_map[Y_INDEX_MAP[j]]];
-            if (tmp_node->x > nodes[i].x)
+            int connected_counts = i - last_minimum_root;
+            for (int j = last_minimum_root; j < i; j++)
             {
-                if (-1 == tmp_node->category_index)
-                {
-                    tmp_node->category_index = current_category_index;
-                    tmp_path_array[tmp_path_array_index++] = nodex_index_map[Y_INDEX_MAP[j]];
-                }
-                else
-                {
-                    current_category_index = tmp_node->category_index;
-                    for (int k = 0; k < tmp_path_array_index; k++)
-                    {
-                        nodes[tmp_path_array[k]].category_index = current_category_index;
-                    }
-                }
+                nodes[nodes_sorted_index[j]].connected_counts = connected_counts;
             }
+            last_minimum_root = i;
         }
+    }
 
-        if (max_category_index == current_category_index)
+    // 处理最后一段连续的节点
+    if (last_minimum_root < n)
+    {
+        int connected_counts = n - last_minimum_root + 1;
+        for (int j = last_minimum_root; j <= n; j++)
         {
-            max_category_index++;
+            nodes[nodes_sorted_index[j]].connected_counts = connected_counts;
         }
     }
-
-#ifdef DEBUG
-    printOriginArrayInfo(nodes, nodex_index_map, n);
-#endif
-
-    for (int i = 0; i < n; i++)
+    else if (last_minimum_root == n)
     {
-        category_result[nodes[i].category_index] += 1;
+        nodes[nodes_sorted_index[n]].connected_counts = 1;
     }
 
-    // print final result
+    // 打印结果
     for (int i = 0; i < n; i++)
     {
-        Node *tmp_node = &nodes[nodex_index_map[i]];
-        // printf("%d %d %d %d\n", tmp_node->x, tmp_node->y, tmp_node->category_index, category_result[tmp_node->category_index], tmp_node->index);
-        printf("%d\n",category_result[tmp_node->category_index]);
-        
+        printf("%d\n", nodes[i].connected_counts);
     }
     return 0;
 }
